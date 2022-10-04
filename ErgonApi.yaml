@@ -1,0 +1,77 @@
+openapi: "3.0.0"
+info:
+  title: Ergon Api
+  version: "1.0"
+servers:
+  - url: https://api.server.test/v1
+paths:
+  /brands:
+    post:
+      summary: Acquisizione elenco marche pubblicate
+      description: >
+        Viene restituito l'elenco completo delle marche
+                __che hanno almeno un articolo sul web__
+      requestBody:
+        description: Payload Opzionale
+        content:
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/customer'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                    default: "brands"
+                  customer:
+                    $ref: '#/components/schemas/customer'
+                  status:
+                    type: object
+                    properties:
+                      code:
+                        type: integer
+                        example: 0
+                      message:
+                        type: string
+                        example: Success
+                  brands:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/brand'
+                    example:
+                      - marart: HH
+                        desmar: Magneti Marelli
+                      - marart: ASH
+                        desmar: ASHIKA
+
+
+
+
+components:
+  schemas:
+    customer:
+      type: object
+      required:
+        - pivconf
+      properties:
+        pivconf:
+          type: string
+          example: 122121121
+    brand:
+      xml:
+        name: item
+      type: object
+      properties:
+        marart:
+          description: Codice della marca
+          type: string
+        desmar:
+          description: Descrizione della marca
+          type: string
