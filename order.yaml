@@ -1,0 +1,18 @@
+nottes:
+  type: string
+  description: note dell'utente
+spetra:
+  description: spese trasporto
+  type: string
+speimb:
+  description: spese imballaggio
+  type: string
+spevar:
+  description: spese varie
+  type: string
+totone:
+  description: totale oneri
+  type: string
+totcau:
+  description: totale cauzione
+  type: string

@@ -16,7 +16,16 @@ paths:
         content:
           application/xml:
             schema:
-              $ref: '#/components/schemas/customer'
+              type: object
+              xml:
+                name: request
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+              example:
+                customer:
+                  pivconf: 12345678901
+
       responses:
         '200':
           description: OK
@@ -29,19 +38,15 @@ paths:
                 properties:
                   action:
                     type: string
-                    default: "brands"
+                    default: brands
                   customer:
                     $ref: '#/components/schemas/customer'
-                  status:
-                    type: object
-                    properties:
-                      code:
-                        type: integer
-                        example: 0
-                      message:
-                        type: string
-                        example: Success
+                    status:
+                      $ref: '#/components/schemas/status'
                   brands:
+                    xml:
+                      wrapped: true
+                      name: brands
                     type: array
                     items:
                       $ref: '#/components/schemas/brand'
@@ -50,28 +55,714 @@ paths:
                         desmar: Magneti Marelli
                       - marart: ASH
                         desmar: ASHIKA
+  /categories:
+    post:
+      description: |
+        Viene restituto l'elenco completo delle categorie __che hanno almeno un articolo sul web__ o
+        __che hanno almeno una sotto-categoria__.
+      summary: Acquisizione elenco completo o parziale delle categorie web
+      requestBody:
+        description: Payload opzionale
+        content:
+          application/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+                catweb:
+                  $ref: '#/components/schemas/catweb'
+              example:
+                customer:
+                   pivconf: 12121212
+                catweb: 45
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                    default: categories
+                  status:
+                    $ref: '#/components/schemas/status'
+                  catweb:
+                    $ref: '#/components/schemas/catweb'
+                  categories:
+                    $ref: '#/components/schemas/categories'
+              examples:
+                esempio1:
+                  value:
+                    action: categories
+                    status:
+                      code: 1
+                      message: OK
+                    categories:
+                      - catweb: 100
+                        descat: Carrozzeria
+                        codrif:
+                        childs: 1
+                        numart: 0
+                      - catweb: 101
+                        descat: Fanaleria
+                        codrif: 100
+                        childs: 1
+                        numart: 0
+                      - catweb: 112
+                        descat: Motore
+                        codrif:
+                        childs: 1
+                        numart: 0
+                      - catweb: 115
+                        descat: Filtri
+                        codrif: 112
+                        childs: 1
+                        numart: 0
+                      - catweb: 112
+                        descat: Filtri
+                        codrif: 115
+                        childs: 0
+                        numart: 0
+                esempio2:
+                  description: Esempio di response con  __catweb 45__ specificata
+                  value:
+                    action: categories
+                    status:
+                      code: 0
+                      message: OK
+                    catweb: 45
+                    categories:
+                      - catweb: 50
+                        descat: ESTATE
+                        codrif: 45
+                        childs: 0
+                        numart: 17
+                      - catweb: 49
+                        descat: INVERNO
+                        codrif: 45
+                        childs: 0
+                        numart: 19
+  /categoryitems:
+    post:
+      description: "Acquisizione elenco articoli di una specifica categoria"
+      requestBody:
+        content:
+          application/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              required:
+                - catweb
+              properties:
+                customer:
+                  $ref: "#/components/schemas/customer"
+                catweb:
+                  $ref: '#/components/schemas/catweb'
+                marart:
+                  $ref: './Articolo.yaml/#marart'
+              example:
+                customer:
+                  pivconf: 12345678901
+                catweb: 100
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                    default: categoryitems
+                  status:
+                    $ref: "#/components/schemas/status"
+                  catweb:
+                    $ref: "#/components/schemas/catweb"
+                  articles:
+                    $ref: "#/components/schemas/articles"
+                example:
+                  status:
+                    code: 0
+                    message: OK
+                  catweb: 100
+                  articles:
+                    - idaa: 159056
+                    - idaa: 135287
+  /categorybrands:
+    post:
+      description: "Acquisizione elenco marche di una specifica categoria"
+      requestBody:
+        $ref: "#/components/requestBodies/catwebRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                    default: categorybrands
+                  status:
+                    $ref: "#/components/schemas/status"
+                  catweb:
+                    $ref: "#/components/schemas/catweb"
+                  brands:
+                    type: array
+                    xml:
+                      name: brands
+                      wrapped: true
+                    items:
+                      $ref: "#/components/schemas/brand"
+                example:
+                  status:
+                    code: 0
+                    message: OK
+                  catweb: 100
+                  brands:
+                    - marart: MM
+                      desmar: Magneti Marelli
+                      numart: 3
+                    - marart: ASH
+                      desmar: ASHIKA
+                      numart: 2
+  #Non terminato, chiedere chiarimenti
+  /categoryfeatures:
+    post:
+      description: "Acquisizione caratteristiche di una specifica categoria"
+      requestBody:
+        $ref: "#/components/requestBodies/catwebRequest"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  status:
+                    $ref: "#/components/schemas/status"
+                  catweb:
+                    $ref: "#/components/schemas/catweb"
+  /articles:
+    post:
+      summary: "Ricerca articoli"
+      description: |
+        Viene restituito un elenco di articoli a partire da un codice di ricerca ed eventualmente dalla marca di riferimento.
+        Il codice articolo in input viene ripulito degli eventuali caratteri speciali.
+        Il codice della marca è utilizzato come filtro sull'elenco articoli trovato a partire dal codice.
+      requestBody:
+        content:
+          application/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              required:
+                - search
+              properties:
+                customer:
+                  $ref: "#/components/schemas/customer"
+                search:
+                  type: string
+                  description: |
+                    Articolo da ricercare (di default matching sul codice)
+                marart:
+                  $ref: "#/components/schemas/marart"
+                codlis:
+                  $ref: "#/components/schemas/codlis"
+                similar:
+                  type: boolean
+                  default: false
+                  description: ricerca simile
+              example:
+                customer:
+                  pivconf: 12345678901
+                search: 1953GR
+                similar: true
+
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                    default: articles
+                  status:
+                    $ref: "#/components/schemas/status"
+                  articles:
+                    $ref: "#/components/schemas/articles"
+                example:
+                    status:
+                      code: 0
+                      message: OK
+                    articles:
+                      - idaa: 126958
+                      - idaa: 185641
+  /alternatives:
+    post:
+      description: Restituisce la catena completa degli articoli alternativi (compresi cross-reference) di uno specifico articolo.
+      summary: Acquisizione catena di articoli alternativi
+      requestBody:
+        content:
+          application/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              properties:
+                customer:
+                  $ref: "#/components/schemas/customer"
+                idcc:
+                  type: integer
+                  description: identificativo catena
+              example:
+                customer:
+                  pivconf: 12345678901
+                idcc: 93
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                    default: alternatives
+                  status:
+                    $ref: "#/components/schemas/status"
+                  articles:
+                    type: array
+                    xml:
+                      name: articles
+                    items:
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        codart:
+                          $ref: "#/components/schemas/codart"
+                        marart:
+                          $ref: "#/components/schemas/marart"
+                        desmar:
+                          $ref: "#/components/schemas/desmar"
+                        desart:
+                          $ref: "#/components/schemas/desart"
+##CHIARIRE, PRESENTE CAMPO NELL'ESEMPIO MA NON IN TABELLA
+                example:
+                  action: alternatives
+                  status:
+                    code: 0
+                    message: OK
+                  articles:
+                    - codart: 168952
+                      marart: 025020
+                      desmar: BS
+                      desart: Bosch
+                    - codart: 576432
+                      marart: MM
+                      desmar: Magneti Marelli
+                      desart: Candeletta
+  /articledetail:
+    post:
+      description: |
+        Questa funzione restituisce i dati completi relativi ad una o più schede articolo per un massimo di 10 elementi.
+        Il prezzo restituito è un prezzo scontato (finale) relativo al cliente indicato (`customer`). In assenza di cliente ("customer" non indicato)
+        viene restituito un prezzo relativo all'utente `guest` (definito a livello applicativo utilizzando una categoria-cliente).
+        Come codice cliente "customer" possono essere utilizzati: P.IVA, Cod.Fiscale, Cod. alternativo (ad es. un codice account esterno).
+        L'articolo può essere identificato nelle seguenti modalità (in ordine di priorità):
+        1. nodo "idaa": attraverso l'identificativo articolo.
+        2. nodi "codart" e "marart": attraverso il codice articolo e il codice marca Ergon.
+        3. nodi "codart" e "codlis": attraverso il codice articolo e il codice listino (per es. TecDoc).
+        La quantità richiesta è opzionale ma è consigliabile indicarla per consentire al sistema di rilevare eventuali prezzi speciali legati alle
+        quantità (promo).
+      requestBody:
+        content:
+          application/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              properties:
+                customer:
+                  $ref: "#/components/schemas/customer"
+                articles:
+                  type: array
+                  xml:
+                    wrapped: true
+                  items:
+                    type: object
+                    xml:
+                      name: item
+                    properties:
+                      idaa:
+                        $ref: "#/components/schemas/idaa"
+                      qtaart:
+                        $ref: "#/components/schemas/qtaart"
+                      codaart:
+                        $ref: "#/components/schemas/codart"
+                      marart:
+                        $ref: "#/components/schemas/marart"
+                      codlis:
+                        $ref: "#/components/schemas/codlis"
+              example:
+                customer:
+                  pivconf: 12345678901
+                articles:
+                  - idaa: 162945
+                    qtaart: 1
+                  - idaa: 232562
+                    qtaart: 1
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                    default: articledetail
+                  status:
+                    $ref: "#/components/schemas/status"
+                  articles:
+                    type: array
+                    items:
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        idaa:
+                          $ref: "#/components/schemas/idaa"
+                        tiprif:
+                          $ref: "#/components/schemas/tiprif"
+                        codart:
+                          $ref: "#/components/schemas/codart"
+                        marart:
+                          $ref: "#/components/schemas/marart"
+                        desmar:
+                          $ref: "#/components/schemas/desmar"
+                        desart:
+                          $ref: "#/components/schemas/desart"
+                        disatt:
+                          $ref: "#/components/schemas/disatt"
+                        przart:
+                          $ref: "#/components/schemas/przart"
+                        idcc:
+                          $ref: "#/components/schemas/idcc"
+                example:
+                  action: articledetail
+                  status:
+                    code: 0
+                    message: OK
+                  articles:
+                  - idaa: 162945
+                    tiprif: 1
+                    codart: 1953GR
+                    marart: MM
+                    desmar: Magneti Marelli
+                    desart: Ammmortizzatore Anteriore Dx
+                    disatt: 10
+                    przart: 10.33
+                    idcc:
+                  - idaa: 232562
+                    tiprif: 1
+                    codart: 025020
+                    marart: BS
+                    desmar: Bosh
+                    desart: Candeletta
+                    disatt: 5
+                    przart: 19.56
+                    idcc: 45
+  /checkout:
+    post:
+      description: |
+        Questa funzione consente di inserire un nuovo ordine (checkout) relativo all'utente indicando la partita IVA del cliente.
+        Opzionalmente è possiblie indicare delle note.
+        Prevede 2 step:
+        1. La funzione viene chiamata per ottenere i dati di chiusura dell'ordine: spese associate, oneri, cauzioni e prezzi degli articoli. La
+        response fornisce un token che rappresenta una prenotazione di checkout valida per 15 minuti.
+        2. La funzione viene chiamata nuovamente ripassando il token per effettuare il checkout vero e proprio. Se saranno passati 15
+        minuti oppure si trasmettono prezzi e/o quantità differenti dalla prenotazione, il token verrà riconosciuto non valido e la
+        transazione verrà rifiutata.
+        Se non si specifica alcun prezzo (nodo przcof) si dichiara l'intenzione di "accettare" i prezzi elaborati dal server. In questo
+        caso non verrà creato alcun token e l'ordine verrà generato direttamente (lo step 2 non sarà necessario)
+      summary: Inserimento ordine
+      requestBody:
+        content:
+          application/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              properties:
+                customer:
+                  $ref: "#/components/schemas/customer"
+                order:
+                  $ref: "#/components/schemas/order"
+                articles:
+                  xml:
+                    wrapped: true
+                  type: array
+                  items:
+                    xml:
+                      name: item
+                    type: object
+                    properties:
+                      idaa:
+                        $ref: "#/components/schemas/idaa"
+                      qtaart:
+                        $ref: "#/components/schemas/qtaart"
+                      przcof:
+                        $ref: "#/components/schemas/przcof"
+              example:
+                customer:
+                  pivconf: 12345678901
+                order:
+                  nottes: ""
+                articles:
+                  - idaa: 1
+                    qtaart: 2
+                    przcof: 18.00000
+                  - idaa: 2
+                    qtaart: 2
+                    przcof: 1.79000
+      responses:
+        "200":
+          description: "OK"
+          content:
+            application/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  status:
+                    $ref: "#/components/schemas/status"
+                  token:
+                    description: token generato da restituire
+                  customer:
+                    type: string
+                    description: Partita IVA
+                  order:
+                    type: object
+                    properties:
+                      nottes:
+                        $ref: "./order.yaml#/nottes"
+                      spetra:
+                        $ref: "./order.yaml#/spetra"
+                      speimb:
+                        $ref: "./order.yaml#/speimb"
+                      spevar:
+                        $ref: "./order.yaml#/spevar"
+                      totone:
+                        $ref: "./order.yaml#/totone"
+                      totcau:
+                        $ref: "./order.yaml#/totcau"
+                  articles:
+                    type: array
+                    xml:
+                      wrapped: true
+                    items:
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        idaa:
+                          $ref: "./article.yaml#/idaa"
+                        qtaart:
+                          $ref: "./article.yaml#/qtaart"
+                        przcof:
+                          $ref: "./article.yaml#/przcof"
+                example:
+                  status:
+                    code: 0
+                    message: OK
+                  token: MTYxODI0NTA1NTk1OTplMjlkMDdmOTQ3ODFkMmYyZjQzMTA0NTFiZWE4MDdlYg==
+                  customer: 12345678901
+                  order:
+                    nottes: ""
+                    spetra: 0
+                    speimb: 0
+                    spevar: 0
+                    totone: 0
+                    totcau: 0
+                  articles:
+                    - idaa: 1
+                      qtaart: 2
+                      przcof: 18.00000
+                    - idaa: 2
+                      qtaart: 2
+                      przcof: 1.79000
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 
 components:
   schemas:
+    status:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: Success
     customer:
       type: object
       required:
         - pivconf
       properties:
         pivconf:
+          description: Paratita IVA o Codice Fiscale
           type: string
           example: 122121121
+    desmar:
+      $ref: "./Articolo.yaml#/desmar"
+    marart:
+      $ref: "./Articolo.yaml#/marart"
+    codart:
+      $ref: "./Articolo.yaml#/codart"
+    desart:
+      $ref: "./Articolo.yaml#/desart"
+    idaa:
+      $ref: "./Articolo.yaml#/idaa"
+    qtaart:
+      $ref: "./Articolo.yaml#/qtaart"
+    codlis:
+      $ref: "./Articolo.yaml#/codlis"
+    przart:
+      $ref: "./Articolo.yaml#/przart"
+    przcof:
+      $ref: "./Articolo.yaml#/przcof"
+    disatt:
+      $ref: "./Articolo.yaml#/disatt"
+    idcc:
+      $ref: "./Articolo.yaml#/idcc"
+    tiprif:
+      $ref: "./Articolo.yaml#/tiprif"
+    order:
+      type: object
+      properties:
+        nottes:
+          type: string
+          description: note dell'utente
     brand:
       xml:
         name: item
       type: object
       properties:
         marart:
-          description: Codice della marca
-          type: string
+          $ref: '#/components/schemas/marart'
         desmar:
-          description: Descrizione della marca
+          $ref: "#/components/schemas/desmar"
+        numart:
           type: string
+          description: numero di articoli ordinati
+    catweb:
+      description: identificativo categoria
+      type: integer
+    category:
+      xml:
+        name: item
+      type: object
+      properties:
+        descat:
+          description: Descrizione Categoria
+          type: string
+        codrif:
+          description: |
+            Eventuale identificativo della categoria padre.
+            Può essere nullo nel caso di una foglia.
+          type: integer
+        childs:
+          description: numero di sotto-categorie
+          type: integer
+        numart:
+          description: numero di item (articoli)
+          type: integer
+        catweb:
+          $ref: '#/components/schemas/catweb'
+    categories:
+      xml:
+        wrapped: true
+        name: categories
+      type: array
+      items:
+        $ref: '#/components/schemas/category'
+    articles:
+      xml:
+        wrapped: true
+        name: articles
+      type: array
+      items:
+        xml:
+          name: item
+        type: object
+        properties:
+          idaa:
+            $ref: "#/components/schemas/idaa"
+  requestBodies:
+    catwebRequest:
+      content:
+        application/xml:
+          schema:
+            xml:
+              name: request
+            type: object
+            required:
+              - catweb
+            properties:
+              customer:
+                $ref: "#/components/schemas/customer"
+              catweb:
+                $ref: "#/components/schemas/catweb"
+            example:
+              customer:
+                pivconf: 12345678901
+              catweb: 100
+
+
+
+
+
+

@@ -1,0 +1,43 @@
+desmar:
+  description: Descrizione della marca
+  type: string
+marart:
+  description: Codice della marca
+  type: string
+codart:
+  description: codice articolo
+  type: String
+desart:
+  description: descrizione articolo
+  type: string
+qtaart:
+  description: quntità articolo
+  type: number
+  format: float
+idaa:
+  description: identificativo articolo
+  type: integer
+codlis:
+  description: codice listino
+  type: string
+przart:
+  description: prezzo scontato (senza iva)
+  type: number
+  format: float
+tiprif:
+  description: |
+    tipologia articolo:
+      * 1: articolo di anagrafica
+      * 2: cross reference
+  type: integer
+idcc:
+  description: identificativo catena alternativi dell'articolo
+  type: integer
+disatt:
+  description: disponibilità corrente
+  type: number
+  format: float
+przcof:
+  description: prezzo del''articolo
+  type: number
+  format: float
