@@ -1,20 +1,71 @@
-openapi: "3.0.0"
+openapi: 3.0.0
 info:
   title: Ergon Api
-  version: "1.0"
+  version: '1.0'
+  description: |
+    Il presente documento definisce le specifiche necessarie per integrare un ecommerce (o portale) con i dati Ergon.
+    Lo scambio di dati avviene in formato XML (o JSON) attraverso chiamate HTTP di tipo POST.
+    È necessario che lo user-agent di tali chiamate sia diverso dai seguenti: __InternetMeasurement, request, qwantify, applebot, dotbot,
+    sogou, censys, adsbot, zgrab, libwww, perl, yandex, mj12bot, tchelebi, gdnplus, curl, python, excel, msffice, bingbot, semrushbot,
+    dataforseobot, zoombot, ahrefsbot, petalbot, googlebot__.
+    L'accesso a questi servizi è consentito attraverso un token di autenticazione generato a partire da un account che viene messo a
+    disposizione da Cointa. Questo account può essere di due tipi:
+    1. Identifica il cliente del quale si vogliono reperire le informazioni. In questo caso il token è sufficiente per identificarsi.
+    2. Rappresenta un account generico con il quale richiedere le informazioni di uno o più clienti (tipica situazione di un intermediario
+    che reperisce i dati per conto dei propri clienti). In questo caso è necessario specificare in ogni chiamata la partita IVA o il
+    Codice Fiscale del cliente per identificarsi (in caso di identificativo non univoco viene restituito errore).
+    E' onere del portale esterno gestire:
+    Eventuale mapping tra i brand-id e le marche di Ergon
+    I carrelli progressivamente popolati
+    Per elevare il livello di sicurezza, l'endpoint può essere configurato per essere raggiungibile soltanto da un elenco di IP convenuto.
+    L'interazione è pensata per essere bidirezionale e, attraverso l'utilizzo di un'interfaccia in standard RESTful
 servers:
-  - url: https://api.server.test/v1
+  - url: ENDPOINT/ws/wso/ergon.ws.wso
+security:
+  - ApiKeyAuth: []
 paths:
+  /login/{user}/{password}:
+    servers:
+      - url: ENDPOINT/ws
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
+    post:
+      summary: Login
+      description: |
+        Restituisce il token di login da inserire nei cookie di qualsiasi chiamata.
+        NB: il token, in base alle impostazioni del server e al tempo di inutilizzo da parte del client, potrebbe scadere. Se ciò avviene va
+        rigenerato per essere nuovamente utilizzato. Ci si accorge della scadenza del token quando si riceve lo status HTTP 403.
+      parameters:
+        - in: path
+          name: user
+          schema:
+            type: string
+          required: true
+        - in: path
+          name: password
+          schema:
+            type: string
+          required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: token per l'accesso
+              example: 73316C0B99CC879D92D2CCAB7668A9BB
   /brands:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
     post:
       summary: Acquisizione elenco marche pubblicate
-      description: >
+      description: |
         Viene restituito l'elenco completo delle marche
                 __che hanno almeno un articolo sul web__
       requestBody:
-        description: Payload Opzionale
         content:
-          application/xml:
+          text/xml:
             schema:
               type: object
               xml:
@@ -25,12 +76,11 @@ paths:
               example:
                 customer:
                   pivconf: 12345678901
-
       responses:
         '200':
           description: OK
           content:
-            application/xml:
+            text/xml:
               schema:
                 xml:
                   name: response
@@ -38,7 +88,6 @@ paths:
                 properties:
                   action:
                     type: string
-                    default: brands
                   customer:
                     $ref: '#/components/schemas/customer'
                     status:
@@ -49,22 +98,39 @@ paths:
                       name: brands
                     type: array
                     items:
-                      $ref: '#/components/schemas/brand'
-                    example:
-                      - marart: HH
-                        desmar: Magneti Marelli
-                      - marart: ASH
-                        desmar: ASHIKA
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        desmar:
+                          description: Descrizione della marca
+                          type: string
+                        marart:
+                          description: Codice della marca
+                          type: string
+                example:
+                  action: brands
+                  status:
+                    code: 0
+                    message: OK
+                  brands:
+                    - marart: HH
+                      desmar: Magneti Marelli
+                    - marart: ASH
+                      desmar: ASHIKA
   /categories:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
     post:
-      description: |
-        Viene restituto l'elenco completo delle categorie __che hanno almeno un articolo sul web__ o
+      description: >
+        Viene restituto l'elenco completo delle categorie __che hanno almeno un
+        articolo sul web__ o
+
         __che hanno almeno una sotto-categoria__.
       summary: Acquisizione elenco completo o parziale delle categorie web
       requestBody:
-        description: Payload opzionale
         content:
-          application/xml:
+          text/xml:
             schema:
               xml:
                 name: request
@@ -73,16 +139,19 @@ paths:
                 customer:
                   $ref: '#/components/schemas/customer'
                 catweb:
-                  $ref: '#/components/schemas/catweb'
+                  description: |
+                    Se specificata, limita la ricerca ai "childs"
+                    (sub-categories) della categoria indicata
+                  type: integer
               example:
                 customer:
-                   pivconf: 12121212
+                  pivconf: 12121212
                 catweb: 45
       responses:
-        "200":
-          description: "OK"
+        '200':
+          description: OK
           content:
-            application/xml:
+            text/xml:
               schema:
                 xml:
                   name: response
@@ -90,13 +159,37 @@ paths:
                 properties:
                   action:
                     type: string
-                    default: categories
                   status:
                     $ref: '#/components/schemas/status'
                   catweb:
-                    $ref: '#/components/schemas/catweb'
+                    description: identificativo categoria
+                    type: integer
                   categories:
-                    $ref: '#/components/schemas/categories'
+                    type: array
+                    xml:
+                      wrapped: true
+                    items:
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        descat:
+                          description: Descrizione Categoria
+                          type: string
+                        codrif:
+                          description: |
+                            Eventuale identificativo della categoria padre.
+                            Può essere nullo nel caso di una foglia.
+                          type: integer
+                        childs:
+                          description: numero di sotto-categorie
+                          type: integer
+                        numart:
+                          description: numero di item (articoli)
+                          type: integer
+                        catweb:
+                          description: identificativo categoria
+                          type: integer
               examples:
                 esempio1:
                   value:
@@ -107,7 +200,7 @@ paths:
                     categories:
                       - catweb: 100
                         descat: Carrozzeria
-                        codrif:
+                        codrif: null
                         childs: 1
                         numart: 0
                       - catweb: 101
@@ -117,7 +210,7 @@ paths:
                         numart: 0
                       - catweb: 112
                         descat: Motore
-                        codrif:
+                        codrif: null
                         childs: 1
                         numart: 0
                       - catweb: 115
@@ -131,7 +224,8 @@ paths:
                         childs: 0
                         numart: 0
                 esempio2:
-                  description: Esempio di response con  __catweb 45__ specificata
+                  description: |
+                    Esempio di response con  __catweb 45__ specificata
                   value:
                     action: categories
                     status:
@@ -150,11 +244,14 @@ paths:
                         childs: 0
                         numart: 19
   /categoryitems:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
     post:
-      description: "Acquisizione elenco articoli di una specifica categoria"
+      summary: Acquisizione elenco articoli di una specifica categoria
+      description: Acquisizione elenco articoli di una specifica categoria
       requestBody:
         content:
-          application/xml:
+          text/xml:
             schema:
               xml:
                 name: request
@@ -163,20 +260,25 @@ paths:
                 - catweb
               properties:
                 customer:
-                  $ref: "#/components/schemas/customer"
+                  $ref: '#/components/schemas/customer'
                 catweb:
-                  $ref: '#/components/schemas/catweb'
+                  description: |
+                    Categoria di cui ottenere gli articoli
+                    abbinati
+                  type: integer
                 marart:
-                  $ref: './Articolo.yaml/#marart'
+                  description: |
+                    Marca a cui limitare la ricerca
+                  type: string
               example:
                 customer:
                   pivconf: 12345678901
                 catweb: 100
       responses:
-        "200":
-          description: "OK"
+        '200':
+          description: OK
           content:
-            application/xml:
+            text/xml:
               schema:
                 xml:
                   name: response
@@ -184,14 +286,26 @@ paths:
                 properties:
                   action:
                     type: string
-                    default: categoryitems
                   status:
-                    $ref: "#/components/schemas/status"
+                    $ref: '#/components/schemas/status'
                   catweb:
-                    $ref: "#/components/schemas/catweb"
+                    description: Categoria richiesta
+                    type: integer
                   articles:
-                    $ref: "#/components/schemas/articles"
+                    xml:
+                      wrapped: true
+                      name: articles
+                    type: array
+                    items:
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        idaa:
+                          description: identificativo articolo
+                          type: integer
                 example:
+                  action: categoryitems
                   status:
                     code: 0
                     message: OK
@@ -200,15 +314,38 @@ paths:
                     - idaa: 159056
                     - idaa: 135287
   /categorybrands:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
     post:
-      description: "Acquisizione elenco marche di una specifica categoria"
+      summary: Acquisizione elenco marche di una specifica categoria
+      description: Acquisizione elenco marche di una specifica categoria
       requestBody:
-        $ref: "#/components/requestBodies/catwebRequest"
+        content:
+          text/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              required:
+                - catweb
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+                catweb:
+                  description: |
+                    Categoria di cui ottenere i marchi
+                    abbinati (presenza di almeno un
+                    articolo)
+                  type: integer
+              example:
+                customer:
+                  pivconf: 12345678901
+                catweb: 100
       responses:
-        "200":
-          description: "OK"
+        '200':
+          description: OK
           content:
-            application/xml:
+            text/xml:
               schema:
                 xml:
                   name: response
@@ -218,17 +355,31 @@ paths:
                     type: string
                     default: categorybrands
                   status:
-                    $ref: "#/components/schemas/status"
+                    $ref: '#/components/schemas/status'
                   catweb:
-                    $ref: "#/components/schemas/catweb"
+                    description: Categoria richiesta
+                    type: integer
                   brands:
                     type: array
                     xml:
                       name: brands
                       wrapped: true
                     items:
-                      $ref: "#/components/schemas/brand"
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        marart:
+                          description: Codice della marca
+                          type: string
+                        desmar:
+                          description: Descrizione della marca
+                          type: string
+                        numart:
+                          type: string
+                          description: Numero di articoli ordinati
                 example:
+                  action: categorybrands
                   status:
                     code: 0
                     message: OK
@@ -240,34 +391,88 @@ paths:
                     - marart: ASH
                       desmar: ASHIKA
                       numart: 2
-  #Non terminato, chiedere chiarimenti
   /categoryfeatures:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
     post:
-      description: "Acquisizione caratteristiche di una specifica categoria"
-      requestBody:
-        $ref: "#/components/requestBodies/catwebRequest"
-      responses:
-        "200":
-          description: "OK"
-          content:
-            application/xml:
-              schema:
-                type: object
-                properties:
-                  status:
-                    $ref: "#/components/schemas/status"
-                  catweb:
-                    $ref: "#/components/schemas/catweb"
-  /articles:
-    post:
-      summary: "Ricerca articoli"
-      description: |
-        Viene restituito un elenco di articoli a partire da un codice di ricerca ed eventualmente dalla marca di riferimento.
-        Il codice articolo in input viene ripulito degli eventuali caratteri speciali.
-        Il codice della marca è utilizzato come filtro sull'elenco articoli trovato a partire dal codice.
+      summary: Acquisizione caratteristiche di una specifica categoria
+      description: Acquisizione caratteristiche di una specifica categoria
       requestBody:
         content:
-          application/xml:
+          text/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              required:
+                - catweb
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+                catweb:
+                  description: |
+                    Categoria di cui ottenere gli articoli
+                    abbinati
+                  type: integer
+              example:
+                customer:
+                  pivconf: 12345678901
+                catweb: 100
+      responses:
+        '200':
+          description: OK
+          content:
+            text/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/status'
+                  catweb:
+                    description: identificativo categoria
+                    type: integer
+                  features:
+                    type: array
+                    xml:
+                      wrapped: true
+                      name: values
+                    items:
+                      xml:
+                        name: item
+                      type: string
+                example:
+                  action: category features
+                  status:
+                    code: 0
+                    message: OK
+                  catweb: 100
+                  features:
+                    - Altezza
+                    - COLORE
+                    - LARGHEZZA
+                    - POLLIC
+                    - TIPO
+  /articles:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
+    post:
+      summary: Ricerca articoli
+      description: >
+        Viene restituito un elenco di articoli a partire da un codice di ricerca
+        ed eventualmente dalla marca di riferimento.
+
+        Il codice articolo in input viene ripulito degli eventuali caratteri
+        speciali.
+
+        Il codice della marca è utilizzato come filtro sull'elenco articoli
+        trovato a partire dal codice.
+      requestBody:
+        content:
+          text/xml:
             schema:
               xml:
                 name: request
@@ -276,15 +481,17 @@ paths:
                 - search
               properties:
                 customer:
-                  $ref: "#/components/schemas/customer"
+                  $ref: '#/components/schemas/customer'
                 search:
                   type: string
                   description: |
                     Articolo da ricercare (di default matching sul codice)
                 marart:
-                  $ref: "#/components/schemas/marart"
+                  description: Codice della marca
+                  type: string
                 codlis:
-                  $ref: "#/components/schemas/codlis"
+                  description: codice listino
+                  type: string
                 similar:
                   type: boolean
                   default: false
@@ -294,12 +501,11 @@ paths:
                   pivconf: 12345678901
                 search: 1953GR
                 similar: true
-
       responses:
-        "200":
-          description: "OK"
+        '200':
+          description: OK
           content:
-            application/xml:
+            text/xml:
               schema:
                 xml:
                   name: response
@@ -309,30 +515,45 @@ paths:
                     type: string
                     default: articles
                   status:
-                    $ref: "#/components/schemas/status"
+                    $ref: '#/components/schemas/status'
                   articles:
-                    $ref: "#/components/schemas/articles"
+                    xml:
+                      wrapped: true
+                      name: articles
+                    type: array
+                    items:
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        idaa:
+                          description: identificativo articolo
+                          type: integer
                 example:
-                    status:
-                      code: 0
-                      message: OK
-                    articles:
-                      - idaa: 126958
-                      - idaa: 185641
+                  status:
+                    code: 0
+                    message: OK
+                  articles:
+                    - idaa: 126958
+                    - idaa: 185641
   /alternatives:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
     post:
-      description: Restituisce la catena completa degli articoli alternativi (compresi cross-reference) di uno specifico articolo.
+      description: >-
+        Restituisce la catena completa degli articoli alternativi (compresi
+        cross-reference) di uno specifico articolo.
       summary: Acquisizione catena di articoli alternativi
       requestBody:
         content:
-          application/xml:
+          text/xml:
             schema:
               xml:
                 name: request
               type: object
               properties:
                 customer:
-                  $ref: "#/components/schemas/customer"
+                  $ref: '#/components/schemas/customer'
                 idcc:
                   type: integer
                   description: identificativo catena
@@ -341,10 +562,10 @@ paths:
                   pivconf: 12345678901
                 idcc: 93
       responses:
-        "200":
-          description: "OK"
+        '200':
+          description: OK
           content:
-            application/xml:
+            text/xml:
               schema:
                 xml:
                   name: response
@@ -354,7 +575,7 @@ paths:
                     type: string
                     default: alternatives
                   status:
-                    $ref: "#/components/schemas/status"
+                    $ref: '#/components/schemas/status'
                   articles:
                     type: array
                     xml:
@@ -364,15 +585,23 @@ paths:
                         name: item
                       type: object
                       properties:
-                        codart:
-                          $ref: "#/components/schemas/codart"
+                        idaa:
+                          type: integer
+                          description: |
+                            Id articolo (NULL in caso di Cross
+                            Reference)
                         marart:
-                          $ref: "#/components/schemas/marart"
+                          description: Codice della marca
+                          type: string
                         desmar:
-                          $ref: "#/components/schemas/desmar"
+                          description: Descrizione della marca
+                          type: string
                         desart:
-                          $ref: "#/components/schemas/desart"
-##CHIARIRE, PRESENTE CAMPO NELL'ESEMPIO MA NON IN TABELLA
+                          description: descrizione articolo
+                          type: string
+                        codart:
+                          type: string
+                          description: codice articolo
                 example:
                   action: alternatives
                   status:
@@ -380,7 +609,7 @@ paths:
                     message: OK
                   articles:
                     - codart: 168952
-                      marart: 025020
+                      marart: 25020
                       desmar: BS
                       desart: Bosch
                     - codart: 576432
@@ -388,28 +617,48 @@ paths:
                       desmar: Magneti Marelli
                       desart: Candeletta
   /articledetail:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
     post:
-      description: |
-        Questa funzione restituisce i dati completi relativi ad una o più schede articolo per un massimo di 10 elementi.
-        Il prezzo restituito è un prezzo scontato (finale) relativo al cliente indicato (`customer`). In assenza di cliente ("customer" non indicato)
-        viene restituito un prezzo relativo all'utente `guest` (definito a livello applicativo utilizzando una categoria-cliente).
-        Come codice cliente "customer" possono essere utilizzati: P.IVA, Cod.Fiscale, Cod. alternativo (ad es. un codice account esterno).
-        L'articolo può essere identificato nelle seguenti modalità (in ordine di priorità):
+      summary: Acquisizione Scheda articolo
+      description: >
+        Questa funzione restituisce i dati completi relativi ad una o più schede
+        articolo per un massimo di 10 elementi.
+
+        Il prezzo restituito è un prezzo scontato (finale) relativo al cliente
+        indicato (`customer`). In assenza di cliente ("customer" non indicato)
+
+        viene restituito un prezzo relativo all'utente `guest` (definito a
+        livello applicativo utilizzando una categoria-cliente).
+
+        Come codice cliente "customer" possono essere utilizzati: P.IVA,
+        Cod.Fiscale, Cod. alternativo (ad es. un codice account esterno).
+
+        L'articolo può essere identificato nelle seguenti modalità (in ordine di
+        priorità):
+
         1. nodo "idaa": attraverso l'identificativo articolo.
-        2. nodi "codart" e "marart": attraverso il codice articolo e il codice marca Ergon.
-        3. nodi "codart" e "codlis": attraverso il codice articolo e il codice listino (per es. TecDoc).
-        La quantità richiesta è opzionale ma è consigliabile indicarla per consentire al sistema di rilevare eventuali prezzi speciali legati alle
+
+        2. nodi "codart" e "marart": attraverso il codice articolo e il codice
+        marca Ergon.
+
+        3. nodi "codart" e "codlis": attraverso il codice articolo e il codice
+        listino (per es. TecDoc).
+
+        La quantità richiesta è opzionale ma è consigliabile indicarla per
+        consentire al sistema di rilevare eventuali prezzi speciali legati alle
+
         quantità (promo).
       requestBody:
         content:
-          application/xml:
+          text/xml:
             schema:
               xml:
                 name: request
               type: object
               properties:
                 customer:
-                  $ref: "#/components/schemas/customer"
+                  $ref: '#/components/schemas/customer'
                 articles:
                   type: array
                   xml:
@@ -420,15 +669,21 @@ paths:
                       name: item
                     properties:
                       idaa:
-                        $ref: "#/components/schemas/idaa"
+                        description: identificativo articolo
+                        type: integer
                       qtaart:
-                        $ref: "#/components/schemas/qtaart"
+                        description: quantità articolo
+                        type: number
+                        format: float
                       codaart:
-                        $ref: "#/components/schemas/codart"
+                        description:  codice articolo
+                        type: string
                       marart:
-                        $ref: "#/components/schemas/marart"
+                        description: Codice della marca
+                        type: string
                       codlis:
-                        $ref: "#/components/schemas/codlis"
+                        description: codice listino
+                        type: string
               example:
                 customer:
                   pivconf: 12345678901
@@ -438,10 +693,10 @@ paths:
                   - idaa: 232562
                     qtaart: 1
       responses:
-        "200":
-          description: "OK"
+        '200':
+          description: OK
           content:
-            application/xml:
+            text/xml:
               schema:
                 xml:
                   name: response
@@ -451,7 +706,7 @@ paths:
                     type: string
                     default: articledetail
                   status:
-                    $ref: "#/components/schemas/status"
+                    $ref: '#/components/schemas/status'
                   articles:
                     type: array
                     items:
@@ -460,73 +715,113 @@ paths:
                       type: object
                       properties:
                         idaa:
-                          $ref: "#/components/schemas/idaa"
+                          description: identificativo articolo
+                          type: integer
                         tiprif:
-                          $ref: "#/components/schemas/tiprif"
+                          description: |
+                            tipologia articolo:
+                              * 1: articolo di anagrafica
+                              * 2: cross reference
+                          type: integer
                         codart:
-                          $ref: "#/components/schemas/codart"
+                          description: codice articolo
+                          type: string
                         marart:
-                          $ref: "#/components/schemas/marart"
+                          description: Codice della marca
+                          type: string
                         desmar:
-                          $ref: "#/components/schemas/desmar"
+                          description: Descrizione della marca
+                          type: string
                         desart:
-                          $ref: "#/components/schemas/desart"
+                          description: descrizione articolo
+                          type: string
                         disatt:
-                          $ref: "#/components/schemas/disatt"
+                          description: disponibilità corrente
+                          type: number
+                          format: float
                         przart:
-                          $ref: "#/components/schemas/przart"
+                          description: prezzo scontato (senza iva)
+                          type: number
+                          format: float
                         idcc:
-                          $ref: "#/components/schemas/idcc"
+                          description: identificativo catena alternativi dell'articolo
+                          type: integer
                 example:
                   action: articledetail
                   status:
                     code: 0
                     message: OK
                   articles:
-                  - idaa: 162945
-                    tiprif: 1
-                    codart: 1953GR
-                    marart: MM
-                    desmar: Magneti Marelli
-                    desart: Ammmortizzatore Anteriore Dx
-                    disatt: 10
-                    przart: 10.33
-                    idcc:
-                  - idaa: 232562
-                    tiprif: 1
-                    codart: 025020
-                    marart: BS
-                    desmar: Bosh
-                    desart: Candeletta
-                    disatt: 5
-                    przart: 19.56
-                    idcc: 45
+                    - idaa: 162945
+                      tiprif: 1
+                      codart: 1953GR
+                      marart: MM
+                      desmar: Magneti Marelli
+                      desart: Ammmortizzatore Anteriore Dx
+                      disatt: 10
+                      przart: 10.33
+                      idcc: null
+                    - idaa: 232562
+                      tiprif: 1
+                      codart: 25020
+                      marart: BS
+                      desmar: Bosh
+                      desart: Candeletta
+                      disatt: 5
+                      przart: 19.56
+                      idcc: 45
   /checkout:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
     post:
-      description: |
-        Questa funzione consente di inserire un nuovo ordine (checkout) relativo all'utente indicando la partita IVA del cliente.
+      description: >
+        Questa funzione consente di inserire un nuovo ordine (checkout) relativo
+        all'utente indicando la partita IVA del cliente.
+
         Opzionalmente è possiblie indicare delle note.
+
         Prevede 2 step:
-        1. La funzione viene chiamata per ottenere i dati di chiusura dell'ordine: spese associate, oneri, cauzioni e prezzi degli articoli. La
-        response fornisce un token che rappresenta una prenotazione di checkout valida per 15 minuti.
-        2. La funzione viene chiamata nuovamente ripassando il token per effettuare il checkout vero e proprio. Se saranno passati 15
-        minuti oppure si trasmettono prezzi e/o quantità differenti dalla prenotazione, il token verrà riconosciuto non valido e la
+
+        1. La funzione viene chiamata per ottenere i dati di chiusura
+        dell'ordine: spese associate, oneri, cauzioni e prezzi degli articoli.
+        La
+
+        response fornisce un token che rappresenta una prenotazione di checkout
+        valida per 15 minuti.
+
+        2. La funzione viene chiamata nuovamente ripassando il token per
+        effettuare il checkout vero e proprio. Se saranno passati 15
+
+        minuti oppure si trasmettono prezzi e/o quantità differenti dalla
+        prenotazione, il token verrà riconosciuto non valido e la
+
         transazione verrà rifiutata.
-        Se non si specifica alcun prezzo (nodo przcof) si dichiara l'intenzione di "accettare" i prezzi elaborati dal server. In questo
-        caso non verrà creato alcun token e l'ordine verrà generato direttamente (lo step 2 non sarà necessario)
+
+        Se non si specifica alcun prezzo (nodo przcof) si dichiara l'intenzione
+        di "accettare" i prezzi elaborati dal server. In questo
+
+        caso non verrà creato alcun token e l'ordine verrà generato direttamente
+        (lo step 2 non sarà necessario)
       summary: Inserimento ordine
       requestBody:
         content:
-          application/xml:
+          text/xml:
             schema:
               xml:
                 name: request
               type: object
               properties:
+                token:
+                  type: string
+                  description: token generato per la prenotazione checkout
                 customer:
-                  $ref: "#/components/schemas/customer"
+                  $ref: '#/components/schemas/customer'
                 order:
-                  $ref: "#/components/schemas/order"
+                  type: object
+                  properties:
+                    nottes:
+                      type: string
+                      description: note dell'utente
                 articles:
                   xml:
                     wrapped: true
@@ -537,37 +832,62 @@ paths:
                     type: object
                     properties:
                       idaa:
-                        $ref: "#/components/schemas/idaa"
+                        description: identificativo articolo
+                        type: integer
                       qtaart:
-                        $ref: "#/components/schemas/qtaart"
+                        description: quantità articolo
+                        type: number
+                        format: float
                       przcof:
-                        $ref: "#/components/schemas/przcof"
-              example:
-                customer:
-                  pivconf: 12345678901
-                order:
-                  nottes: ""
-                articles:
-                  - idaa: 1
-                    qtaart: 2
-                    przcof: 18.00000
-                  - idaa: 2
-                    qtaart: 2
-                    przcof: 1.79000
+                        description: prezzo del''articolo
+                        type: number
+                        format: float
+            examples:
+              step1:
+                value:
+                  customer:
+                    pivconf: 12345678901
+                  order:
+                    nottes: ''
+                  articles:
+                    - idaa: 1
+                      qtaart: 2
+                      przcof: 18
+                    - idaa: 2
+                      qtaart: 2
+                      przcof: 1.79
+              step2:
+                value:
+                  token: >-
+                    MTYxODI0NTA1NTk1OTplMjlkMDdmOTQ3ODFkMmYyZjQzMTA0NTFiZWE4MDdlYg==
+                  customer:
+                    pivconf: 12345678901
+                  order:
+                    nottes: ''
+                  articles:
+                    - idaa: 1
+                      qtaart: 2
+                      przcof: 18
+                    - idaa: 2
+                      qtaart: 2
+                      przcof: 1.79
       responses:
-        "200":
-          description: "OK"
+        '200':
+          description: OK
           content:
-            application/xml:
+            text/xml:
               schema:
                 xml:
                   name: response
                 type: object
                 properties:
+                  action:
+                    type: string
                   status:
-                    $ref: "#/components/schemas/status"
+                    $ref: '#/components/schemas/status'
                   token:
                     description: token generato da restituire
+                    type: string
                   customer:
                     type: string
                     description: Partita IVA
@@ -575,17 +895,26 @@ paths:
                     type: object
                     properties:
                       nottes:
-                        $ref: "./order.yaml#/nottes"
+                        type: string
+                        description: note dell'utente
                       spetra:
-                        $ref: "./order.yaml#/spetra"
+                        description: spese trasporto
+                        type: string
                       speimb:
-                        $ref: "./order.yaml#/speimb"
+                        description: spese imballaggio
+                        type: string
                       spevar:
-                        $ref: "./order.yaml#/spevar"
+                        description: spese varie
+                        type: string
                       totone:
-                        $ref: "./order.yaml#/totone"
+                        description: totale oneri
+                        type: string
                       totcau:
-                        $ref: "./order.yaml#/totcau"
+                        description: totale cauzione
+                        type: string
+                      idmv:
+                        description: identificativo ordine
+                        type: string
                   articles:
                     type: array
                     xml:
@@ -596,46 +925,635 @@ paths:
                       type: object
                       properties:
                         idaa:
-                          $ref: "./article.yaml#/idaa"
+                          description: identificativo articolo
+                          type: integer
                         qtaart:
-                          $ref: "./article.yaml#/qtaart"
+                          description: quntità articolo
+                          type: number
+                          format: float
                         przcof:
-                          $ref: "./article.yaml#/przcof"
+                          description: prezzo del''articolo
+                          type: number
+                          format: float
+              examples:
+                step1:
+                  value:
+                    action:
+                      type: string
+                      default: checkout
+                    status:
+                      code: 0
+                      message: OK
+                    token: >-
+                      MTYxODI0NTA1NTk1OTplMjlkMDdmOTQ3ODFkMmYyZjQzMTA0NTFiZWE4MDdlYg==
+                    customer: 12345678901
+                    order:
+                      nottes: ''
+                      spetra: 0
+                      speimb: 0
+                      spevar: 0
+                      totone: 0
+                      totcau: 0
+                    articles:
+                      - idaa: 1
+                        qtaart: 2
+                        przcof: 18
+                      - idaa: 2
+                        qtaart: 2
+                        przcof: 1.79
+                step2:
+                  value:
+                    action:
+                      type: string
+                      default: checkout
+                    status:
+                      code: 0
+                      message: OK
+                    token: >-
+                      MTYxODI0NTA1NTk1OTplMjlkMDdmOTQ3ODFkMmYyZjQzMTA0NTFiZWE4MDdlYg==
+                    order:
+                      idmv: 1352
+  /orders:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
+    post:
+      summary: Acquisizione elenco ordini
+      description: |
+        Questa funzione restituisce l'elenco degli ordini di un cliente.
+        *NB: si può consultare l'archivio ordini degli ultimi 5 anni.*
+      requestBody:
+        content:
+          text/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+                datefrom:
+                  type: string
+                  description: Data in formato AAAAMMGG
+                dateto:
+                  type: string
+                  description: Data in formato AAAAMMGG
+              example:
+                customer:
+                  pivconf: 12345678901
+                datefrom: 20150101
+                dateto: 20163112
+      responses:
+        '200':
+          description: ''
+          content:
+            text/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/status'
+                  orders:
+                    type: array
+                    xml:
+                      wrapped: true
+                    items:
+                      type: object
+                      xml:
+                        name: item
+                      properties:
+                        idmv:
+                          description: identificativo ordine
+                          type: string
+                        datlis:
+                          type: string
+                          description: data ordine
+                        numlis:
+                          type: integer
+                          description: numero ordine
+                        totmer:
+                          type: number
+                          format: float
+                        totiva:
+                          type: number
+                          format: float
                 example:
                   status:
                     code: 0
                     message: OK
-                  token: MTYxODI0NTA1NTk1OTplMjlkMDdmOTQ3ODFkMmYyZjQzMTA0NTFiZWE4MDdlYg==
-                  customer: 12345678901
-                  order:
-                    nottes: ""
-                    spetra: 0
-                    speimb: 0
-                    spevar: 0
-                    totone: 0
-                    totcau: 0
+                  orders:
+                    - idmv: 1652
+                      datlis: 20150207
+                      numlis: 352
+                      totmer: 100
+                      totiva: 22
+                    - idmv: 1717
+                      datlis: 20150226
+                      numlis: 381
+                      totmer: 50
+                      totiva: 11
+  /orderdetail:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
+    post:
+      summary: Acquisizione dettaglio ordine
+      description: >
+        Elenco articoli contenuti in un ordine.
+
+        *NB: i dati dell'articolo vengono salvati nell'ordine in fase di
+        checkout, in modo che eventuali modifiche anagrafiche successive non
+
+        alterino i dati utilizzati in fase di conferma ordine.*
+      requestBody:
+        content:
+          text/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              required:
+                - idmv
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+                idmv:
+                  description: identificativo ordine
+                  type: string
+              example:
+                customer:
+                  pivconf: 12345678901
+                idmv: 1717
+      responses:
+        '200':
+          description: OK
+          content:
+            text/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/status'
                   articles:
-                    - idaa: 1
+                    xml:
+                      wrapped: true
+                    type: array
+                    items:
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        idaa:
+                          description: identificativo articolo
+                          type: integer
+                        marart:
+                          description: Codice della marca
+                          type: string
+                        desmar:
+                          description: Descrizione della marca
+                          type: string
+                        desart:
+                          description: descrizione articolo
+                          type: string
+                        qtaart:
+                          description: quntità articolo
+                          type: number
+                          format: float
+                        przsco:
+                          type: number
+                          format: float
+                          description: Prezzo articolo in fase di inserimento ordine
+                        merrig:
+                          type: number
+                          format: float
+                          description: totale riga
+                example:
+                  status:
+                    code: 0
+                    message: OK
+                  articles:
+                    - idaa: 162945
+                      codart: 1953GR
+                      marart: MM
+                      desmar: Magneti Marelli
+                      desart: Ammmortizzatore Anteriore Dx
+                      qtaart: 10
+                      przsco: 10.33
+                      merrig: 103.3
+                    - idaa: 232562
+                      codart: 25020
+                      marart: BS
+                      desmar: Bosch
+                      desart: Candeletta
                       qtaart: 2
-                      przcof: 18.00000
-                    - idaa: 2
-                      qtaart: 2
-                      przcof: 1.79000
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                      przsco: 19.56
+                      merrig: 39.12
+  /deliverynotes:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
+    post:
+      summary: Acquisizione elenco bolle (ultimi 30 giorni)
+      description: Questa funzione restituisce l'elenco delle bolle di un cliente.
+      requestBody:
+        content:
+          text/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+              example:
+                customer:
+                  pivconf: 12345678901
+      responses:
+        '200':
+          description: OK
+          content:
+            text/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/status'
+                  deliverynotes:
+                    type: array
+                    xml:
+                      wrapped: true
+                    items:
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        idmv:
+                          type: integer
+                          description: identificativo bolla
+                        datpre:
+                          type: string
+                          description: data bolla
+                        tippre:
+                          type: string
+                          description: tipo bolla
+                        numpre:
+                          type: number
+                          format: float
+                          description: numero bolla
+                        letpre:
+                          type: string
+                          description: lettera bolla
+                        despre:
+                          type: string
+                          description: descrizione bolla
+                        desspe:
+                          type: string
+                          description: descrizione spedizione
+                example:
+                  action: deliverynotes
+                  status:
+                    code: 0
+                    message: OK
+                  deliverynotes:
+                    - idmv: 65341
+                      datpre: 20211001
+                      tippre: BA
+                      numpre: 351
+                      letpre: ''
+                      despre: D.D.T. di Vendita
+                      desspe: 00100 Roma (RM)
+                    - idmv: 65342
+                      datpre: 20211001
+                      tippre: BA
+                      numpre: 352
+                      letpre: ''
+                      despre: D.D.T. di Vendita
+                      desspe: 00100 Roma (RM)
+  /deliverynotedetail:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
+    post:
+      summary: Acquisizione dettaglio bolla
+      description: Elenco articoli contenuti in una bolla.
+      requestBody:
+        content:
+          text/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+                idmv:
+                  type: string
+                  description: |
+                    Identificativo bolla (è possibile passare
+                    un elenco di idmv separati da virgola)
+              example:
+                customer:
+                  pivconf: 12345678901
+                idmv: 1717
+      responses:
+        '200':
+          description: OK
+          content:
+            text/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/status'
+                  deliverynotes:
+                    type: array
+                    xml:
+                      wrapped: true
+                    items:
+                      xml:
+                        name: item
+                      type: object
+                      properties:
+                        idmv:
+                          type: integer
+                          description: identificativo bolla
+                        datpre:
+                          type: string
+                          description: data bolla
+                        tippre:
+                          type: string
+                          description: tipo bolla
+                        numpre:
+                          type: number
+                          format: float
+                          description: numero bolla
+                        letpre:
+                          type: string
+                          description: lettera bolla
+                        despre:
+                          type: string
+                          description: descrizione bolla
+                        desspe:
+                          type: string
+                          description: descrizione spedizione
+                        articles:
+                          type: array
+                          xml:
+                            wrapped: true
+                          items:
+                            type: object
+                            xml:
+                              name: item
+                            properties:
+                              desmar:
+                                description: Descrizione della marca
+                                type: string
+                              marart:
+                                description: Codice della marca
+                                type: string
+                              desart:
+                                description: descrizione articolo
+                                type: string
+                              qtaart:
+                                description: quntità articolo
+                                type: number
+                                format: float
+                              idaa:
+                                description: identificativo articolo
+                                type: integer
+                              sc1art:
+                                type: number
+                                format: float
+                              sc2art:
+                                type: number
+                                format: float
+                              sc3art:
+                                type: number
+                                format: float
+                              flgtra:
+                                type: string
+                                description: |
+                                  Tipo trattamento (O=omaggio,
+                                  G=garanzia, S=sostituzione)
+                example:
+                  action: deliverynotedetail
+                  status:
+                    code: 0
+                    message: OK
+                  deliverynotes:
+                    - idmv: 65341
+                      datpre: 20211001
+                      tippre: BA
+                      numpre: 351
+                      letpre: null
+                      despre: D.D.T. di Vendita
+                      desspe: 00100 Roma (RM)
+                      articles:
+                        - idaa: 162945
+                          codart: 1953GR
+                          marart: MM
+                          desmar: Magneti Marelli
+                          desart: Ammmortizzatore Anteriore Dx
+                          qtaart: 1
+                          przart: 27.01
+                          sc1art: 5
+                          sc2art: 10
+                          sc3art: 0
+                          flgtra: O
+                        - idaa: 232562
+                          codart: 25020
+                          marart: BS
+                          desmar: Bosch
+                          desart: Candeletta
+                          qtaart: 2
+                          przart: 112.56
+                          sc1art: 13.6
+                          sc2art: 0
+                          sc3art: 0
+                          flgtra: ''
+  /invoices:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
+    post:
+      summary: Acquisizione fatture (non ancora implementato)
+      description: >-
+        Questa funzione restituisce l'elenco completo delle fatture di un
+        cliente.
+      requestBody:
+        content:
+          text/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              required:
+                - customer
+                - datefrom
+                - dateto
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+                datefrom:
+                  type: string
+                  description: Data in formato AAAAMMGG
+                dateto:
+                  type: string
+                  description: Data in formato AAAAMMGG
+              example:
+                customer:
+                  pivconf: 12345678901
+                datefrom: 20150101
+                dateto: 20163112
+      responses:
+        '200':
+          description: OK
+          content:
+            text/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/status'
+                  invoices:
+                    type: array
+                    xml:
+                      wrapped: true
+                    items:
+                      type: object
+                      xml:
+                        name: invoice
+                      properties:
+                        type:
+                          type: string
+                          description: Tipo Documento
+                        date:
+                          type: string
+                          description: Data della fattura
+                        number:
+                          type: string
+                          description: Numero della Fattura
+                        total:
+                          type: number
+                          format: float
+                          description: |
+                            Importo totale della fattura in divisa
+                            (valuta) standard
+                example:
+                  action: invoices
+                  status:
+                    code: 0
+                    message: OK
+                  invoices:
+                    - type: FD
+                      date: 20160113
+                      number: 332/F
+                      total: 733
+                    - type: FI
+                      date: 20160315
+                      number: 411
+                      total: 1212
+  /invoice:
+    parameters:
+      - $ref: '#/components/parameters/userAgent'
+    post:
+      summary: Download fattura (non ancora implementato)
+      description: >-
+        Questa funzione consente il download di una singola fattura in formato
+        PDF (encoding BASE64), se presente nella base dati a seguito di
+        un'operazione di archiviazione.
+      requestBody:
+        content:
+          text/xml:
+            schema:
+              xml:
+                name: request
+              type: object
+              required:
+                - customer
+                - type
+                - year
+                - number
+              properties:
+                customer:
+                  $ref: '#/components/schemas/customer'
+                type:
+                  type: string
+                  description: Tipo Documento
+                year:
+                  type: string
+                  description: Anno di riferimento
+                number:
+                  type: string
+                  description: |
+                    Numero documento (eventuale sezionale
+                    separato da "/" )
+              example:
+                customer:
+                  pivconf: 12345678901
+                type: FD
+                year: 2016
+                number: 332/F
+      responses:
+        "200":
+          description: OK
+          content:
+            text/xml:
+              schema:
+                xml:
+                  name: response
+                type: object
+                properties:
+                  action:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/status'
+                  invoice:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        description: Tipo Documento
+                      year:
+                        type: string
+                        description: Anno della fattura
+                      number:
+                        type: string
+                        description: Numero della fattura
+                      content:
+                        type: string
+                        description: 'Stream PDF (encoding: base64)'
+                example:
+                  action: invoice
+                  status:
+                    code: 0
+                    message: OK
+                  invoice:
+                    type: FD
+                    year: 2016
+                    number: 332/F
+                    content: |
+                      JVBERi0xLjYNJeLjz9MNCjM1MSAwIG9iag08PC9GaWx0ZXIvRmxhdGVEZWNvZGUvRmly
+                      c3QgNzAwL0xlbmd0aCAxMjIyL04gOTAvVHlwZS9PYmpTdG0+PnN0cmVhbQ0KaN6Ul01v
+                      IzcMhv+Kju2hO5JIfQGLBRbtoUXSNFhvT0YOg3SQDZDYgeMAzb/vS9GzqLP2SLkME+vl
+                      o6FIUZpgrImmZJMMRWeyYRtMMezZOGs4wTiTMhnnTfbeODIZOsemWGsctFSMAyFl4xJ8
+                      5IE/bYjGYcSWYDyEjth4+LlERjAeIC/UAItJfIENwBMsXEl0QLHowGPRgcfQkUwMHYEX
+                      oCPwInT4ycUcDKZyCTACL0VY8DLCInk1hgUviw68Ah2DV6Bjh1eFjj0sdIwpLXQsr.....
 components:
   schemas:
     status:
@@ -655,114 +1573,18 @@ components:
         pivconf:
           description: Paratita IVA o Codice Fiscale
           type: string
-          example: 122121121
-    desmar:
-      $ref: "./Articolo.yaml#/desmar"
-    marart:
-      $ref: "./Articolo.yaml#/marart"
-    codart:
-      $ref: "./Articolo.yaml#/codart"
-    desart:
-      $ref: "./Articolo.yaml#/desart"
-    idaa:
-      $ref: "./Articolo.yaml#/idaa"
-    qtaart:
-      $ref: "./Articolo.yaml#/qtaart"
-    codlis:
-      $ref: "./Articolo.yaml#/codlis"
-    przart:
-      $ref: "./Articolo.yaml#/przart"
-    przcof:
-      $ref: "./Articolo.yaml#/przcof"
-    disatt:
-      $ref: "./Articolo.yaml#/disatt"
-    idcc:
-      $ref: "./Articolo.yaml#/idcc"
-    tiprif:
-      $ref: "./Articolo.yaml#/tiprif"
-    order:
-      type: object
-      properties:
-        nottes:
-          type: string
-          description: note dell'utente
-    brand:
-      xml:
-        name: item
-      type: object
-      properties:
-        marart:
-          $ref: '#/components/schemas/marart'
-        desmar:
-          $ref: "#/components/schemas/desmar"
-        numart:
-          type: string
-          description: numero di articoli ordinati
-    catweb:
-      description: identificativo categoria
-      type: integer
-    category:
-      xml:
-        name: item
-      type: object
-      properties:
-        descat:
-          description: Descrizione Categoria
-          type: string
-        codrif:
-          description: |
-            Eventuale identificativo della categoria padre.
-            Può essere nullo nel caso di una foglia.
-          type: integer
-        childs:
-          description: numero di sotto-categorie
-          type: integer
-        numart:
-          description: numero di item (articoli)
-          type: integer
-        catweb:
-          $ref: '#/components/schemas/catweb'
-    categories:
-      xml:
-        wrapped: true
-        name: categories
-      type: array
-      items:
-        $ref: '#/components/schemas/category'
-    articles:
-      xml:
-        wrapped: true
-        name: articles
-      type: array
-      items:
-        xml:
-          name: item
-        type: object
-        properties:
-          idaa:
-            $ref: "#/components/schemas/idaa"
-  requestBodies:
-    catwebRequest:
-      content:
-        application/xml:
-          schema:
-            xml:
-              name: request
-            type: object
-            required:
-              - catweb
-            properties:
-              customer:
-                $ref: "#/components/schemas/customer"
-              catweb:
-                $ref: "#/components/schemas/catweb"
-            example:
-              customer:
-                pivconf: 12345678901
-              catweb: 100
-
-
-
+  securitySchemes:
+    ApiKeyAuth:        # arbitrary name for the security scheme
+      type: apiKey
+      in: cookie       # can be "header", "query" or "cookie"
+      name: JSESSIONID  # name of the header, query parameter or cookie
+  parameters:
+    userAgent:
+      in: header
+      name: User-Agent
+      schema:
+        type: string
+        default: set default in root document
 
 
 
